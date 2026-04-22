@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "BusinessSettings": {
+      "title": "Business Settings",
+      "description": "Configuration for the business owner",
+      "type": "object",
+      "properties": {
+        "phoneNumber": {
+          "type": "string",
+          "description": "The business phone number connected"
+        },
+        "missedCallSmsTemplate": {
+          "type": "string",
+          "description": "The template for the automated SMS reply"
+        },
+        "googleReviewLink": {
+          "type": "string",
+          "description": "The link sent to customers for reviews"
+        },
+        "autoReplyEnabled": {
+          "type": "boolean",
+          "description": "Whether to automatically send the SMS"
+        }
+      },
+      "required": ["phoneNumber", "missedCallSmsTemplate"]
+    },
+    "CallLog": {
+      "title": "Call Log",
+      "description": "A record of a missed call",
+      "type": "object",
+      "properties": {
+        "customerNumber": {
+          "type": "string",
+          "description": "The phone number of the customer who called"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the call occurred"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["missed", "responded", "settled"],
+          "description": "The current status of the lead"
+        },
+        "smsSent": {
+          "type": "boolean",
+          "description": "Whether the automated SMS was sent"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Internal notes from the business owner"
+        },
+        "reviewLinkSent": {
+          "type": "boolean",
+          "description": "Whether the Google review link was sent"
+        }
+      },
+      "required": ["customerNumber", "timestamp", "status"]
+    }
+  },
+  "firestore": {
+    "/settings/{userId}": {
+      "schema": "BusinessSettings",
+      "description": "User specific business settings"
+    },
+    "/calls/{userId}/logs/{callId}": {
+      "schema": "CallLog",
+      "description": "Lead logs for a specific business owner"
+    }
+  }
+}
