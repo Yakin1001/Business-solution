@@ -1,44 +1,63 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // 0. Default deny
     match /{document=**} {
       allow read, write: if false;
     }
 
+    // 0.1 Global Helpers
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isSignedIn() && (request.auth.uid == userId || request.auth.token.email == userId);
     }
 
+    // Relaxed ID check to allow email-based IDs if necessary
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128 && id.size() > 0;
     }
 
-    // Settings
+    // 0.2 Health Check
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // 1. Settings (User Profiles)
     match /settings/{userId} {
+      function isValidSettings(data) {
+        return (data.get('phoneNumber', '') is string) && 
+               (data.get('missedCallSmsTemplate', '') is string);
+      }
+
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && 
-        request.resource.data.keys().hasAll(['phoneNumber', 'missedCallSmsTemplate']) &&
-        request.resource.data.phoneNumber is string &&
-        request.resource.data.missedCallSmsTemplate is string;
+      allow create: if isOwner(userId) && isValidSettings(request.resource.data);
+      allow update: if isOwner(userId) && isValidSettings(request.resource.data);
     }
 
-    // Call Logs
-    match /calls/{userId}/logs/{callId} {
+    // 2. Call Logs
+    match /calls/{userId}/logs/{logId} {
+      function isValidLog(data) {
+        return (data.get('customerNumber', '') is string) &&
+               (data.get('status', 'missed') in ['missed', 'responded', 'settled']);
+      }
+
       allow read: if isOwner(userId);
+      
       allow create: if isOwner(userId) && 
-        isValidId(callId) &&
-        request.resource.data.keys().hasAll(['customerNumber', 'timestamp', 'status']) &&
-        request.resource.data.customerNumber is string &&
-        request.resource.data.status in ['missed', 'responded', 'settled'];
-        
-      allow update: if isOwner(userId) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'notes', 'reviewLinkSent', 'smsSent']);
-        
+        isValidId(logId) &&
+        isValidLog(request.resource.data);
+
+      allow update: if isOwner(userId) && (
+        // Allow updating any fields from the dashboard
+        request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'status', 'notes', 'reviewLinkSent', 'smsSent', 'rating', 
+          'gatekeepingStep', 'customerName', 'lastMessage'
+        ])
+      );
+
       allow delete: if isOwner(userId);
     }
   }
