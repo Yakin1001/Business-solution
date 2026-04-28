@@ -25,6 +25,11 @@ service cloud.firestore {
       allow read: if true;
     }
 
+    // 0.2 Health Check
+    match /test/connection {
+      allow read: if true;
+    }
+
     // 1. Settings (User Profiles)
     match /settings/{userId} {
       function isValidSettings(data) {

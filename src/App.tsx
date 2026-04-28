@@ -357,6 +357,11 @@ function SettingsView({ settings, userId }: { settings: BusinessSettings, userId
                              ? "Trial accounts can only send SMS to verified numbers." 
                              : "Using WhatsApp Sandbox. Upgrade Twilio to use your own professional number."}
                         </p>
+                        <p className="text-[9px] text-slate-400 italic">
+                           {form.preferredChannel === 'sms' 
+                             ? "Trial accounts can only send SMS to verified numbers." 
+                             : "Using WhatsApp Sandbox. Upgrade Twilio to use your own professional number."}
+                        </p>
                     </div>
                     <div className="space-y-4">
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Automation Status</label>
