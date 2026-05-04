@@ -4,8 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import twilio from "twilio";
-import { initializeApp, getApps, applicationDefault } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { initializeApp as initClientApp } from "firebase/app";
+import { getFirestore as getClientFirestore, collection, addDoc, getDocs, doc, updateDoc, serverTimestamp, query, where, limit } from "firebase/firestore";
 import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
 
 dotenv.config();
@@ -13,14 +13,71 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin for real-time DB access from webhook
-if (!getApps().length) {
-  initializeApp({
-    projectId: firebaseConfig.projectId
-  });
-}
-// Use getFirestore with the specific database ID
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+// Initialize Firebase Client SDK for backend (acts as pseudo-admin due to relaxed rules)
+const app = initClientApp(firebaseConfig);
+const clientDb = getClientFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+export const FieldValue = {
+  serverTimestamp: serverTimestamp
+};
+
+// Mock admin DB to avoid rewriting the entire server logic
+export const db: any = {
+  collection: (pathStr: string) => {
+    return {
+      get: async () => {
+        const snap = await getDocs(collection(clientDb, pathStr));
+        return {
+          empty: snap.empty,
+          size: snap.size,
+          docs: snap.docs.map(d => ({ id: d.id, data: () => d.data() }))
+        };
+      },
+      add: async (data: any) => {
+        const ref = await addDoc(collection(clientDb, pathStr), data);
+        return { id: ref.id };
+      },
+      where: (field: string, op: any, val: any) => {
+        return {
+           limit: (num: number) => {
+             return {
+                get: async () => {
+                   const snap = await getDocs(query(collection(clientDb, pathStr), where(field, op, val), limit(num)));
+                   return {
+                      empty: snap.empty,
+                      size: snap.size,
+                      docs: snap.docs.map(d => ({ id: d.id, data: () => d.data() }))
+                   }
+                }
+             }
+           }
+        }
+      },
+      doc: (docId: string) => {
+        return {
+          update: async (data: any) => {
+            await updateDoc(doc(clientDb, pathStr, docId), data);
+          },
+          collection: (subPath: string) => {
+             return db.collection(`${pathStr}/${docId}/${subPath}`);
+          }
+        }
+      },
+      limit: (num: number) => {
+        return {
+            get: async () => {
+                const snap = await getDocs(query(collection(clientDb, pathStr), limit(num)));
+                return {
+                  empty: snap.empty,
+                  size: snap.size,
+                  docs: snap.docs.map(d => ({ id: d.id, data: () => d.data() }))
+                };
+            }
+        }
+      }
+    };
+  }
+};
 
 console.log(`[FIREBASE] Initialized with Database ID: ${firebaseConfig.firestoreDatabaseId}`);
 
